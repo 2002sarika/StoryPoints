@@ -7,57 +7,52 @@ import altair as alt
 
 STORY_POINTS_FILE = 'story_points.json'
 GRID_VISIBILITY_FILE = 'grid_visibility.json'
+SCRUM_MASTER = ['scrum.master', 'Bhavesh', 'Sarika'] 
 
-#fibonacii check 
-def isFibonacii(num):
+# Fibonacci check function
+def isFibonacci(num):
     def is_perfect_square(x):
         s = int(math.sqrt(x))
         return s * s == x
 
-    # A number is a Fibonacci number if and only if one of these is a perfect square
     return is_perfect_square(5 * num * num + 4) or is_perfect_square(5 * num * num - 4)
 
-    
-# Function to create files if they do not exist
+# Function to create files if they don't exist
 def createfileifnotexists(filename, default_value=None):
     if not os.path.exists(filename):
         with open(filename, 'w') as f:
-            json.dump(default_value, f)  # Create file with default value
+            json.dump(default_value, f)
     else:
-        # Ensure the file is not empty or invalid
         try:
             with open(filename, 'r') as f:
                 json.load(f)
         except (json.JSONDecodeError, ValueError):
             with open(filename, 'w') as f:
-                json.dump(default_value, f)  # Write default value if corrupted
+                json.dump(default_value, f)
 
-# Load story points
+# Load and save story points
 def load_story_points():
     createfileifnotexists(STORY_POINTS_FILE, {})
     with open(STORY_POINTS_FILE, 'r') as f:
         return json.load(f)
 
-# Save story points
 def save_story_points(story_points):
     with open(STORY_POINTS_FILE, 'w') as f:
         json.dump(story_points, f)
 
-# Load grid visibility from the file
+# Load and save grid visibility
 def load_grid_visibility():
     createfileifnotexists(GRID_VISIBILITY_FILE, {"show_grid": False})
     with open(GRID_VISIBILITY_FILE, "r") as f:
         return json.load(f)
 
-# Save grid visibility to the file
 def save_grid_visibility(show_grid):
     with open(GRID_VISIBILITY_FILE, "w") as f:
         json.dump({"show_grid": show_grid}, f)
 
-# Guest mode: Ask for guest name if not already set
+# Guest mode (ask for name and login as guest)
 def guest_mode():
     if "username" not in st.session_state:
-        # Ask the user for their name
         st.title("Welcome to Story Points Board!!!")
         guest_name = st.text_input("Enter your name", "", placeholder="Type your name here...", max_chars=20)
 
@@ -68,13 +63,11 @@ def guest_mode():
                 st.session_state.username = guest_name.strip()  # Store the guest name in session state
                 st.session_state.logged_in = True  # Mark user as logged in
                 st.success(f"Welcome, {guest_name.strip()}!")
-                # Proceed to show the sidebar
-                show_sidebar()
+                show_sidebar()  # Proceed to show the sidebar
             else:
                 st.warning("Please enter a valid name!")
     else:
-        # If the username is already set, show the sidebar
-        show_sidebar()
+        show_sidebar()  # If already logged in, show the sidebar
 
 # Sidebar navigation after login
 def show_sidebar():
@@ -86,61 +79,63 @@ def show_sidebar():
     elif page_option == "Toggle Grid Visibility":
         toggle_grid_visibility()  # Scrum Master can toggle visibility
     elif page_option == "View Charts":
-        view_charts_page()  # All users can view the charts if the grid is visible
+        view_charts_page()  # All users can view the charts if grid is visible
 
 def add_story_points_page():
-    # Ensure user is logged in and has a username
     if "username" not in st.session_state or not st.session_state.username:
         st.warning("Please enter your name before submitting story points.")
         return
 
     st.title(f"Submit Story Points for {st.session_state.username}")
-    story_point = st.number_input("Enter your story points", min_value=1, step=1)
+    fibonacci_numbers = [1, 2, 3, 5, 8, 13, 21, 34]
+    story_point = st.selectbox("Choose Fibonacci Story Points", fibonacci_numbers)
     submit_button = st.button("Submit Story Points")
 
     if submit_button:
         if submit_story_points(st.session_state.username, story_point):
             st.success("Story points submitted successfully!")
         else:
-            st.error("You've already submitted your story points or didnt maintain a fibonacii series.")
+            st.error("You've already submitted your story points or didn't maintain a Fibonacci series.")
 
 def submit_story_points(username, points):
     story_points = load_story_points()
-    
-    if isFibonacii(points):
+    if isFibonacci(points):
         if username in story_points:
             return False  # Already submitted
-    
         story_points[username] = points
         save_story_points(story_points)
         return True
     else:
-        st.warning("Please enter fibonacii numbers")
-        
-def view_story_points_grid():
-    st.title("View Submitted Story Points")
-    
+        st.warning("Please enter Fibonacci numbers only.")
+
+def delete_story_point(username):
     story_points = load_story_points()
-    
+    if username in story_points:
+        del story_points[username]
+        save_story_points(story_points)
+
+def delete_all_story_points():
+    save_story_points({})  # Save an empty dictionary to clear all records
+
+def display_story_points_grid():
+    st.title("View and Manage Story Points")
+    story_points = load_story_points()
+
     if not story_points:
         st.write("No story points have been submitted yet.")
         return
-    
-    checkboxes = [st.checkbox(user, key=user) for user in story_points.keys()]
-    data = {"Select" : checkboxes, "User": list(story_points.keys()), "Story Points": list(story_points.values())}
-    df = pd.DataFrame(data)
 
-    # Display the grid in a single table with the checkboxes
-    st.write("**Story Points Grid**")
+    data = {"User": list(story_points.keys()), "Story Points": list(story_points.values())}
+    df = pd.DataFrame(data)
+    checkboxes = [st.checkbox(f"Select {user}", key=user) for user in df['User']]
+    df["Select"] = checkboxes
     st.write(df)
 
-    delete_selected_button = st.button("Delete Selected", key="delete_selected", help="Delete selected story points")
-    
-    delete_all_button = st.button("Delete All", key="delete_all", help="Delete all story points")
-    
-    # Handle "Delete Selected" button action
+    selected_users = df[df['Select']].User.tolist()
+    delete_selected_button = st.button("Delete Selected", key="delete_selected")
+    delete_all_button = st.button("Delete All", key="delete_all")
+
     if delete_selected_button:
-        selected_users = [df['User'][i] for i in range(len(checkboxes)) if checkboxes[i]]
         if selected_users:
             for user in selected_users:
                 delete_story_point(user)
@@ -148,116 +143,78 @@ def view_story_points_grid():
         else:
             st.warning("No users selected for deletion.")
 
-    # Handle "Delete All" button action
     if delete_all_button:
         delete_all_story_points()
         st.success("All story points have been deleted.")
 
-def delete_story_point(username):
-    story_points = load_story_points()
-    if username in story_points:
-        del story_points[username]
-        save_story_points(story_points)
-    
-
-def delete_all_story_points():
-    # Clears all story points data
-    save_story_points({})  # Save an empty dictionary, effectively deleting all records
-
 def toggle_grid_visibility():
-     # Load grid visibility state
     grid_visibility = load_grid_visibility()
     show_grid = grid_visibility["show_grid"]
 
-    if st.session_state.username == "scrum.master":
-        # Button to toggle visibility
+    if st.session_state.username in SCRUM_MASTER:
         if st.button("Show/Hide Story Points Grid"):
-            show_grid = not show_grid  # Toggle visibility
-            save_grid_visibility(show_grid)  # Save the updated state
+            show_grid = not show_grid
+            save_grid_visibility(show_grid)
 
-    # Update visibility based on the state
     if show_grid:
-        view_story_points_grid()
+        display_story_points_grid()
     else:
-        st.warning("You dont have access to see the grid until scrum master gives it!!!")
+        st.warning("You don't have access to see the grid until the Scrum Master gives it!")
 
 def plot_story_points_chart():
     grid_visibility = load_grid_visibility()
     show_grid = grid_visibility["show_grid"]
 
     if show_grid:
-        # Load the story points data
         story_points = load_story_points()
+        data = pd.DataFrame({'User': list(story_points.keys()), 'Story Points': list(story_points.values())})
 
-        # Convert story points to a DataFrame
-        data = pd.DataFrame({
-            'User': list(story_points.keys()),
-            'Story Points': list(story_points.values())
-        })
-
-        # Create the Altair chart with a selection
         selection = alt.selection_single(fields=['User'], bind='legend', name="user_selection", empty="all")
-
         chart = alt.Chart(data).mark_arc().encode(
-            theta='Story Points:Q',
-            color='User:N',
-            tooltip=['User:N', 'Story Points:Q']
-        ).add_selection(
-            selection
-        ).properties(
-            title="Story Points Submitted by Users"
-        )
+            theta='Story Points:Q', color='User:N', tooltip=['User:N', 'Story Points:Q']
+        ).add_selection(selection).properties(title="Story Points Submitted by Users")
 
-        # Display the chart
         st.altair_chart(chart, use_container_width=True)
-
-        return data  # Return data to be used for chart information
-
+        return data
     else:
-        st.warning("You don't have access to see the chart until the scrum master gives it!!!")
+        st.warning("You don't have access to see the chart until the Scrum Master gives it!")
         return None
 
-# Streamlit page to view the chart and toggle chart information
 def view_charts_page():
     st.title("Story Points Charts")
-
-    # Load the chart data
     data = plot_story_points_chart()
 
-    # If data is loaded and displayed, show the "Show Chart Information" button
     if data is not None:
-        # Button to reveal chart information
         show_info_button = st.button("Show Chart Information")
 
         if show_info_button:
-            # Calculate min/max story points and corresponding users
-            min_points = data['Story Points'].min()
-            max_points = data['Story Points'].max()
+            story_point_counts = data['Story Points'].value_counts()
 
-            min_user = data[data['Story Points'] == min_points]['User'].values[0]
-            max_user = data[data['Story Points'] == max_points]['User'].values[0]
-
-            st.markdown(f"""
-             <div style="background-color:red; padding:20px; color:white; border-radius:10px;">
-    <h3>Story Points Information</h3>
-    <p>Min Story Points: 
-        <span style="background-color:white; color:black; padding:3px 6px;">{min_points}</span> 
-        by <span style="background-color:white; color:black; padding:3px 6px;">{min_user}</span>
-    </p>
-    <p>Max Story Points: 
-        <span style="background-color:white; color:black; padding:3px 6px;">{max_points}</span> 
-        by <span style="background-color:white; color:black; padding:3px 6px;">{max_user}</span>
-    </p>
-</div>
-
+            st.markdown("""
+            <style>
+                .streamlit-expanderHeader {
+                    background-color: #4CAF50 !important;
+                    color: white !important;
+                    font-size: 18px !important;
+                    font-weight: bold !important;
+                }
+                .streamlit-expanderContent {
+                    background-color: #f0f8f0 !important;
+                    padding: 15px !important;
+                    border-radius: 10px !important;
+                }
+            </style>
             """, unsafe_allow_html=True)
+
+            with st.expander("Story Point Counts"):
+                for story_point, count in story_point_counts.items():
+                    users = data[data['Story Points'] == story_point]['User'].tolist()
+                    st.write(f"Story Point {story_point} with users - {', '.join(users)}")
     else:
         st.warning("No data available to show information.")
 
-
-# Main entry point
 def main():
-    guest_mode()  # Set up the guest mode
+    guest_mode()
 
 if __name__ == "__main__":
     main()
